@@ -3692,17 +3692,32 @@ internal static class DocxToPdfConverter
                             para,
                             runFontSize * GetFontMetricsFactor(firstRun?.FontName)
                                 * GetLineSpacingMultiple(para, options.LineSpacing));
-                        var textWidth = EstimateTextWidth(text, runFontSize);
-                        var textX = para.Alignment switch
+                        // Text-box paragraphs carry their own text area; others use the margins.
+                        var areaLeft = options.MarginLeft + (para.TextBoxWidth > 0 ? para.IndentLeft : 0);
+                        var areaWidth = para.TextBoxWidth > 0 ? para.TextBoxWidth : usableW;
+                        var bold = firstRun?.Bold ?? false;
+                        var useCalibri = options.UseCalibriWidths
+                            && (string.IsNullOrEmpty(firstRun?.FontName) || firstRun.FontName.Contains("Calibri", StringComparison.OrdinalIgnoreCase));
+                        s_overrideWidths = GetFontOverrideWidths(firstRun?.FontName);
+                        // Keep text that fits verbatim; WordWrap normalizes spacing.
+                        var lines = EstimateWrapTextWidth(text, runFontSize, bold, 0, useCalibri) <= areaWidth
+                            ? [text]
+                            : WordWrap(text, areaWidth, areaWidth, runFontSize, para.TabStops, bold, useCalibriWidths: useCalibri);
+                        s_overrideWidths = null;
+                        foreach (var line in lines)
                         {
-                            "center" => options.MarginLeft + (usableW - textWidth) / 2,
-                            "right" => options.MarginLeft + usableW - textWidth,
-                            _ => options.MarginLeft
-                        };
-                        y -= runFontSize;
-                        page.AddText(text, textX, y, runFontSize, firstRun?.Color ?? para.Color,
-                            bold: firstRun?.Bold ?? false, italic: firstRun?.Italic ?? false, preferredFontName: firstRun?.FontName);
-                        y -= lineHeight - runFontSize;
+                            var textWidth = EstimateTextWidth(line, runFontSize);
+                            var textX = para.Alignment switch
+                            {
+                                "center" => areaLeft + (areaWidth - textWidth) / 2,
+                                "right" => areaLeft + areaWidth - textWidth,
+                                _ => areaLeft
+                            };
+                            y -= runFontSize;
+                            page.AddText(line, textX, y, runFontSize, firstRun?.Color ?? para.Color,
+                                bold: bold, italic: firstRun?.Italic ?? false, preferredFontName: firstRun?.FontName);
+                            y -= lineHeight - runFontSize;
+                        }
                     }
                     lastSpacingAfter = para.SpacingAfter >= 0 ? para.SpacingAfter : 0f;
                     isFirst = false;
