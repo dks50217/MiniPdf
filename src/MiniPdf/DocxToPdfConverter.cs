@@ -3550,8 +3550,11 @@ internal static class DocxToPdfConverter
                         totalHeight += gap;
                     }
 
-                    var fontSize = para.FontSize > 0 ? para.FontSize : options.FontSize;
-                    var estFont = para.Runs.FirstOrDefault(r => !string.IsNullOrEmpty(r.FontName))?.FontName;
+                    var firstRun = headerFooter ? para.Runs.FirstOrDefault(r => !string.IsNullOrEmpty(r.Text)) : null;
+                    var fontSize = firstRun?.FontSize > 0 ? firstRun.FontSize
+                        : para.FontSize > 0 ? para.FontSize : options.FontSize;
+                    var estFont = headerFooter ? firstRun?.FontName
+                        : para.Runs.FirstOrDefault(r => !string.IsNullOrEmpty(r.FontName))?.FontName;
                     var lineHeight = ApplyLineSpacingRule(
                         para,
                         fontSize * GetFontMetricsFactor(estFont) * GetLineSpacingMultiple(para, options.LineSpacing));

@@ -724,9 +724,23 @@ public class DocxToPdfConverterTests
         Assert.All(lines, l => Assert.True(l.Y >= 18f, $"footer line at y={l.Y} is below the footer margin"));
     }
 
-    private static MemoryStream CreateDocxWithFooter(string text, int footerTwips)
+    [Fact]
+    public void Convert_WrappedFooterWithRunFontSize_StaysAboveFooterMargin()
+    {
+        var longText = string.Join(" ", Enumerable.Repeat("Footer notice text", 30));
+        using var docxStream = CreateDocxWithFooter(longText, footerTwips: 360, runHalfPoints: 36);
+
+        var doc = DocxToPdfConverter.Convert(docxStream);
+        var lines = doc.Pages[0].TextBlocks.Where(b => b.Text != "Body").ToList();
+
+        Assert.True(lines.Count > 1, "footer paragraph should wrap");
+        Assert.All(lines, l => Assert.True(l.Y >= 18f, $"footer line at y={l.Y} is below the footer margin"));
+    }
+
+    private static MemoryStream CreateDocxWithFooter(string text, int footerTwips, int? runHalfPoints = null)
     {
         var ms = new MemoryStream();
+        var runProperties = runHalfPoints.HasValue ? $"<w:rPr><w:sz w:val=\"{runHalfPoints.Value}\"/></w:rPr>" : "";
 
         using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
@@ -777,7 +791,7 @@ public class DocxToPdfConverterTests
                 $"""
                 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
                 <w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                  <w:p><w:r><w:t>{EscapeXml(text)}</w:t></w:r></w:p>
+                  <w:p><w:r>{runProperties}<w:t>{EscapeXml(text)}</w:t></w:r></w:p>
                 </w:ftr>
                 """);
         }
