@@ -3630,8 +3630,34 @@ internal static class DocxToPdfConverter
         var lines = EstimateWrapTextWidth(text, runFontSize, bold, 0, useCalibri) <= areaWidth
             ? [text]
             : WordWrap(text, areaWidth, areaWidth, runFontSize, para.TabStops, bold, useCalibriWidths: useCalibri);
+        var result = new List<string>();
+        foreach (var line in lines)
+        {
+            if (EstimateWrapTextWidth(line, runFontSize, bold, 0, useCalibri) <= areaWidth)
+            {
+                result.Add(line);
+                continue;
+            }
+
+            var segment = "";
+            var elements = System.Globalization.StringInfo.GetTextElementEnumerator(line);
+            while (elements.MoveNext())
+            {
+                var next = elements.GetTextElement();
+                if (segment.Length > 0 && Math.Max(
+                        EstimateWrapTextWidth(segment + next, runFontSize, bold, 0, useCalibri),
+                        EstimateTextWidth(segment + next, runFontSize)) > areaWidth)
+                {
+                    result.Add(segment);
+                    segment = "";
+                }
+                segment += next;
+            }
+            if (segment.Length > 0)
+                result.Add(segment);
+        }
         s_overrideWidths = null;
-        return lines;
+        return result;
     }
 
     /// <summary>
@@ -3736,6 +3762,7 @@ internal static class DocxToPdfConverter
                             };
                             y -= runFontSize;
                             page.AddText(line, textX, y, runFontSize, firstRun?.Color ?? para.Color,
+                                maxWidth: para.TextBoxWidth > 0 ? areaWidth : null,
                                 bold: bold, italic: firstRun?.Italic ?? false, preferredFontName: firstRun?.FontName);
                             y -= lineHeight - runFontSize;
                         }

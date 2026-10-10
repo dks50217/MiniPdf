@@ -696,6 +696,21 @@ public class DocxToPdfConverterTests
     }
 
     [Fact]
+    public void Convert_HeaderTextBox_SplitsOversizedUnbreakableWord()
+    {
+        var longText = new string('W', 180);
+        using var docxStream = CreateDocxWithHeaderTextBox(longText, offsetEmu: -457200, widthEmu: 5080000);
+
+        var doc = DocxToPdfConverter.Convert(docxStream);
+        var lines = doc.Pages[0].TextBlocks.Where(b => b.Text != "Body").ToList();
+
+        Assert.True(lines.Count > 1, "oversized word should wrap");
+        Assert.Equal(longText, string.Concat(lines.Select(l => l.Text)));
+        Assert.All(lines, l => Assert.True(l.Text.Length * l.FontSize * 0.9f <= 385.6f));
+        Assert.All(lines, l => Assert.True(l.MaxWidth.HasValue && Math.Abs(l.MaxWidth.Value - 385.6f) < 0.01f));
+    }
+
+    [Fact]
     public void Convert_WrappedFooterParagraph_StaysAboveFooterMargin()
     {
         var longText = string.Join(" ", Enumerable.Repeat("Footer notice text", 30));
